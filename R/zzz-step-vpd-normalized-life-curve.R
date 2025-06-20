@@ -130,6 +130,8 @@ bake.step_vpd_normalized_life_curve <- function(object, new_data, ...) {
   check_new_data(col_names, object, new_data)
   for (col_name in col_names) class(new_data[[col_name]]) <- "list"
   
+  if (nrow(new_data) == 0L || length(col_names) == 0L) return(new_data)
+  
   vph_data <- tibble::tibble(.rows = nrow(new_data))
   for (col_name in col_names) {
     col_vpd <- purrr::map(
@@ -155,9 +157,11 @@ bake.step_vpd_normalized_life_curve <- function(object, new_data, ...) {
     )
     vph_data[[paste(col_name, "nl", sep = "_")]] <- col_vpd
   }
+  vph_col_names <- if (length(col_names) == 0L) col_names else
+    paste(col_names, "nl", sep = "_")
   vph_data <- tidyr::unnest(
     vph_data,
-    cols = tidyr::all_of(paste(col_names, "nl", sep = "_")),
+    cols = tidyr::all_of(vph_col_names),
     names_sep = "_"
   )
   

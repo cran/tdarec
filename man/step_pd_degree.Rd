@@ -8,7 +8,7 @@
 step_pd_degree(
   recipe,
   ...,
-  role = "persistence diagram",
+  role = NA_character_,
   trained = FALSE,
   hom_degrees = NULL,
   columns = NULL,
@@ -57,12 +57,10 @@ recipe step that will separate data sets of persistent pairs by homological
 degree. The input and output must be list-columns.
 }
 \details{
-Additional details...
-
-The \code{hom_degrees} argument sets the homological degrees for which to return
-new list-columns. If not \code{NULL} (the default), it is intersected with the
-degrees found in any specified columns of the training data; otherwise all
-found degrees are used. This parameter cannot be tuned.
+The \code{hom_degrees} argument sets the homological degrees for which to
+return new list-columns. If not \code{NULL} (the default), it is intersected
+with the degrees found in any specified columns of the training data;
+otherwise all found degrees are used. This parameter cannot be tuned.
 }
 \examples{
 dat <- data.frame(
@@ -71,9 +69,9 @@ dat <- data.frame(
 )
 
 ph_rec <- recipe(~ ., data = dat) \%>\% 
-  step_pd_point_cloud(roads, keep_original_cols = FALSE) \%>\% 
-  step_pd_raster(topos, keep_original_cols = FALSE) \%>\% 
-  step_pd_degree(roads_pd, topos_pd)
+  step_pd_point_cloud(roads) \%>\% 
+  step_pd_raster(topos) \%>\% 
+  step_pd_degree(roads, topos)
 ph_prep <- prep(ph_rec, training = dat)
 (ph_res <- bake(ph_prep, dat))
 
@@ -81,9 +79,9 @@ tidy(ph_rec, number = 3)
 tidy(ph_prep, number = 3)
 
 with_degs <- recipe(~ ., data = dat) \%>\% 
-  step_pd_point_cloud(roads, keep_original_cols = FALSE) \%>\% 
-  step_pd_raster(topos, keep_original_cols = FALSE) \%>\% 
-  step_pd_degree(roads_pd, topos_pd, hom_degrees = c(1, 2))
+  step_pd_point_cloud(roads) \%>\% 
+  step_pd_raster(topos) \%>\% 
+  step_pd_degree(roads, topos, hom_degrees = c(1, 2))
 with_degs <- prep(with_degs, training = dat)
 bake(with_degs, dat)
 }

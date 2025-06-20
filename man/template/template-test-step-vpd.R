@@ -1,30 +1,32 @@
 dist_train <- data.frame(
+  pins = "cities",
   dist = I(list(eurodist))
 )
 dist_test <- data.frame(
+  pins = "cities",
   dist = I(list(UScitiesD))
 )
 dist_rec <- recipe(~ ., data = dist_train) |> 
-  step_phom_point_cloud(everything(), keep_original_cols = FALSE)
+  step_pd_point_cloud(dist)
 scale_seq <- seq(0, 5000, 100)
 
 test_that("`step_vpd_()` agrees with raw function", {
   
-  pl_rec <- dist_rec |> 
+  vpd_rec <- dist_rec |> 
     step_vpd_(
-      everything(),
+      dist,
       xseq = scale_seq,
       yseq = scale_seq,
-      {param_vals},
-      keep_original_cols = FALSE
+      {param_vals}
     )
   
-  pl_prep <- prep(pl_rec, training = dist_train)
+  vpd_prep <- prep(vpd_rec, training = dist_train)
   
-  pl_pred <- bake(pl_prep, new_data = dist_test) |> 
+  vpd_pred <- bake(vpd_prep, new_data = dist_test) |> 
+    select(contains("_{name_suffix}_")) |> 
     unlist() |> unname()
   
-  pl_exp <- dist_test$dist[[1L]] |> 
+  vpd_exp <- dist_test$dist[[1L]] |> 
     ripserr::vietoris_rips() |> as.matrix() |> 
     TDAvec::{orig_fun}(
       scaleSeq = scale_seq,
@@ -34,14 +36,14 @@ test_that("`step_vpd_()` agrees with raw function", {
     ) |> 
     as.vector()
   
-  expect_equal(pl_pred, pl_exp)
+  expect_equal(vpd_pred, vpd_exp)
 })
 
 test_that("`tunable()` returns standard names", {
   
-  pl_rec <- dist_rec |> 
-    step_vpd_(everything(), keep_original_cols = FALSE)
-  tun <- tunable(pl_rec$steps[[2]])
+  vpd_rec <- dist_rec |> 
+    step_vpd_(dist)
+  tun <- tunable(vpd_rec$steps[[2]])
   
   expect_equal(
     names(tun),
@@ -53,4 +55,117 @@ test_that("`tunable()` returns standard names", {
   )
   expect_equal(unique(tun$source), "recipe")
   expect_true(is.list(tun$call_info))
+})
+
+# infrastructure tests
+# prompted by issue #14
+
+test_that("recipe and preparation printing is consistent", {
+  vpd_rec <- dist_rec |>
+    step_vpd_(
+      dist,
+      xseq = scale_seq,
+      yseq = scale_seq,
+      {param_vals}
+    )
+  
+  expect_snapshot(print(vpd_rec))
+  expect_snapshot(prep(vpd_rec))
+})
+
+test_that("data with 0 or 1 rows works with `bake()` method", {
+  
+  vpd_prep <- dist_rec |> 
+    step_vpd_(
+      dist,
+      xseq = scale_seq,
+      yseq = scale_seq,
+      {param_vals}
+    ) |> 
+    prep()
+  
+  expect_identical(
+    nrow(bake(vpd_prep, slice(dist_train, 1L))),
+    1L
+  )
+  expect_identical(
+    nrow(bake(vpd_prep, slice(dist_train, 0L))),
+    0L
+  )
+})
+
+test_that("`bake()` method errs needed non-standard role columns are missing", {
+  
+  vpd_rec <- dist_rec |> 
+    step_vpd_(
+      dist,
+      xseq = scale_seq,
+      yseq = scale_seq,
+      {param_vals}
+    ) |>
+    update_role(
+      dist,
+      new_role = "yam"
+    ) |>
+    update_role_requirements(role = "yam", bake = FALSE)
+  
+  vpd_prep <- prep(vpd_rec, training = dist_train)
+  
+  expect_snapshot(
+    error = TRUE,
+    bake(vpd_prep, new_data = subset(dist_test, select = -c(dist)))
+  )
+})
+
+test_that("recipe successfully prints with empty predictors", {
+  
+  vpd_rec <- dist_rec |> 
+    step_vpd_(
+      xseq = scale_seq,
+      yseq = scale_seq,
+      {param_vals}
+    )
+  
+  expect_snapshot(vpd_rec)
+  
+  vpd_prep <- prep(vpd_rec, training = dist_train)
+  
+  expect_snapshot(vpd_prep)
+})
+
+test_that("recipe with empty selection incurs no `prep()` or `bake()` change", {
+  
+  vpd_rec1 <- dist_rec
+  vpd_rec2 <- step_vpd_(
+    vpd_rec1,
+    xseq = scale_seq,
+    yseq = scale_seq,
+    {param_vals}
+  )
+  
+  vpd_prep1 <- prep(vpd_rec1, dist_train)
+  vpd_prep2 <- prep(vpd_rec2, dist_train)
+  
+  vpd_bake1 <- bake(vpd_prep1, dist_train)
+  vpd_bake2 <- bake(vpd_prep2, dist_train)
+  
+  expect_identical(vpd_bake1, vpd_bake2)
+})
+
+test_that("tidy method for empty selection works", {
+  
+  vpd_rec <- step_vpd_(
+    dist_rec,
+    xseq = scale_seq,
+    yseq = scale_seq,
+    {param_vals}
+  )
+  
+  expect <- tibble(terms = character(), value = double(), id = character())
+  
+  expect_identical(tidy(vpd_rec, number = 2L), expect)
+  
+  vpd_prep <- prep(vpd_rec, dist_train)
+  
+  expect_identical(tidy(vpd_prep, number = 2L), expect)
 })
